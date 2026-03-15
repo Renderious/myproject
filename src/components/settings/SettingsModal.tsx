@@ -112,17 +112,17 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
         <div className="border-t border-zinc-800 my-4"></div>
 
-        {/* ComfyUI URL */}
+        {/* Automatic1111 URL */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
-            <i className="ph ph-image text-red-500"></i> Image Generation (ComfyUI)
+            <i className="ph ph-image text-red-500"></i> Image Generation (Automatic1111)
           </label>
           <input
             type="text"
-            value={localSettings.comfyUiUrl}
-            onChange={(e) => setLocalSettings({...localSettings, comfyUiUrl: e.target.value})}
+            value={localSettings.sdUrl}
+            onChange={(e) => setLocalSettings({...localSettings, sdUrl: e.target.value})}
             className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-red-500 transition-colors text-sm"
-            placeholder="http://127.0.0.1:8188"
+            placeholder="http://127.0.0.1:7860"
           />
         </div>
 
