@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAppStore } from "@/store/appStore";
 import { chatWithLLM } from "@/lib/llm";
+import { exportCharacterCard } from "@/lib/export";
 
 interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -39,6 +40,14 @@ export function LabView() {
   }, [messages, isTyping]);
 
   if (!character) {
+    // Inject a dummy character for testing if in dev mode
+    if (process.env.NODE_ENV === 'development') {
+      // Just temporarily expose store to window to inject it
+      if (typeof window !== 'undefined') {
+        (window as any).__store = useAppStore;
+      }
+    }
+
     return (
       <div className="w-full h-full flex flex-col items-center justify-center text-center p-8 animate-fade-in-up">
         <div className="w-20 h-20 mx-auto mb-6 bg-zinc-800/80 rounded-2xl flex items-center justify-center border border-zinc-700/50">
@@ -137,8 +146,10 @@ export function LabView() {
           </div>
 
           <div className="mt-auto pt-4 border-t border-zinc-800">
-             <button className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-colors text-sm font-medium flex items-center justify-center gap-2">
-                <i className="ph ph-download-simple"></i> Export Card (JSON)
+             <button
+                onClick={() => exportCharacterCard(character)}
+                className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-colors text-sm font-medium flex items-center justify-center gap-2">
+                <i className="ph ph-download-simple"></i> Export Card (PNG/JSON)
              </button>
           </div>
         </div>
