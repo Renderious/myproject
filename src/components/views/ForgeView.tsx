@@ -95,6 +95,12 @@ It must include the following keys:
 - "system_prompt": string
 - "post_history_instructions": string
 - "alternate_greetings": array of strings
+- "nickname": string (short name or alias)
+- "creator_notes": string (metadata or notes for the user)
+- "tags": array of strings (e.g. ["fantasy", "elf"])
+- "creator": string (your name or "The Forge")
+- "character_version": string (e.g. "1.0")
+- "group_only_greetings": array of strings (at least empty array [])
 - "sd_prompt": string (A detailed Stable Diffusion prompt for their visual appearance, comma separated tags, style, lighting. E.g. "1girl, cinematic lighting, cyberpunk city, highly detailed, sharp focus, vibrant colors")
 
 Output ONLY valid JSON.`;
@@ -116,6 +122,7 @@ Output ONLY valid JSON.`;
         }
 
         // 3. Save Character and Redirect
+        const now = Math.floor(Date.now() / 1000);
         const newCharacter = {
             id: Date.now().toString(),
             name: characterData.name || "Unknown Persona",
@@ -128,6 +135,13 @@ Output ONLY valid JSON.`;
             system_prompt: characterData.system_prompt || "",
             post_history_instructions: characterData.post_history_instructions || "",
             alternate_greetings: characterData.alternate_greetings || [],
+            nickname: characterData.nickname || "",
+            tags: characterData.tags || [],
+            creator: characterData.creator || "The Forge",
+            character_version: characterData.character_version || "1.0",
+            group_only_greetings: characterData.group_only_greetings || [],
+            creation_date: now,
+            modification_date: now,
             avatarUrl: avatarUrl
         };
 

@@ -11,7 +11,7 @@ interface ChatMessage {
 }
 
 export function LabView() {
-  const { characters, activeCharacterId, settings, updateCharacterAvatar } = useAppStore();
+  const { characters, activeCharacterId, settings, updateCharacterAvatar, updateCharacter } = useAppStore();
   const character = characters.find(c => c.id === activeCharacterId);
 
   const [input, setInput] = useState("");
@@ -19,8 +19,35 @@ export function LabView() {
   const [isTyping, setIsTyping] = useState(false);
   const [isRegeneratingAvatar, setIsRegeneratingAvatar] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Local state for complex JSON fields to allow typing invalid JSON temporarily
+  const [editJsonState, setEditJsonState] = useState<{
+     alternate_greetings: string;
+     group_only_greetings: string;
+     tags: string;
+     creator_notes_multilingual: string;
+     source: string;
+  } | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+
+  // Sync json state when edit mode toggles
+  useEffect(() => {
+    if (isEditing && character) {
+      setEditJsonState({
+         alternate_greetings: JSON.stringify(character.alternate_greetings || [], null, 2),
+         group_only_greetings: JSON.stringify(character.group_only_greetings || [], null, 2),
+         tags: JSON.stringify(character.tags || [], null, 2),
+         creator_notes_multilingual: JSON.stringify(character.creator_notes_multilingual || {}, null, 2),
+         source: JSON.stringify(character.source || [], null, 2),
+      });
+    } else {
+      setEditJsonState(null);
+    }
+  }, [isEditing, character?.id]);
 
   // Initialize chat when character changes
   useEffect(() => {
@@ -121,6 +148,12 @@ Output ONLY valid JSON in this format: { "sd_prompt": "your prompt here" }`;
       if (fileInputRef.current) {
         fileInputRef.current.value = ""; // Reset input
       }
+    }
+  };
+
+  const handleUpdateField = (field: string, value: any) => {
+    if (character) {
+      updateCharacter(character.id, { [field]: value });
     }
   };
 
@@ -225,33 +258,231 @@ Output ONLY valid JSON in this format: { "sd_prompt": "your prompt here" }`;
           </div>
         </div>
 
-        <div className="glass-panel p-5 rounded-2xl border border-zinc-800 flex-1 flex flex-col gap-4">
-          <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2 border-b border-zinc-800 pb-2">
-            <i className="ph ph-file-text text-amber-500"></i> Persona Data
-          </h3>
+        <div className="glass-panel p-5 rounded-2xl border border-zinc-800 flex-1 flex flex-col gap-4 overflow-y-auto">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+            <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+              <i className="ph ph-file-text text-amber-500"></i> Persona Data
+            </h3>
+            <button
+              onClick={() => {
+                if (isEditing && editJsonState) {
+                  // Attempt to parse and save all JSON fields on 'Done'
+                  try {
+                    const updates: any = {};
+                    updates.alternate_greetings = JSON.parse(editJsonState.alternate_greetings);
+                    updates.group_only_greetings = JSON.parse(editJsonState.group_only_greetings);
+                    updates.tags = JSON.parse(editJsonState.tags);
+                    updates.creator_notes_multilingual = JSON.parse(editJsonState.creator_notes_multilingual);
+                    updates.source = JSON.parse(editJsonState.source);
+                    if (character) updateCharacter(character.id, updates);
+                    setIsEditing(false);
+                  } catch (e) {
+                    alert("One of the JSON fields has invalid format. Please fix it before saving.");
+                  }
+                } else {
+                  setIsEditing(true);
+                }
+              }}
+              className="text-amber-500 hover:text-amber-400 text-sm transition-colors"
+            >
+              {isEditing ? <><i className="ph ph-check"></i> Done</> : <><i className="ph ph-pencil-simple"></i> Edit</>}
+            </button>
+          </div>
 
           <div className="space-y-4 text-sm text-zinc-300">
+            {/* Core Fields */}
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Name</span>
+              {isEditing ? (
+                 <input className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none" value={character.name || ""} onChange={(e) => handleUpdateField("name", e.target.value)} />
+              ) : (
+                 <p className="bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.name}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Nickname (V3)</span>
+              {isEditing ? (
+                 <input className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none" value={character.nickname || ""} onChange={(e) => handleUpdateField("nickname", e.target.value)} />
+              ) : (
+                 <p className="bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.nickname || "N/A"}</p>
+              )}
+            </div>
+
             <div>
               <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Description</span>
-              <p className="line-clamp-4 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.description}</p>
+              {isEditing ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-24 resize-none" value={character.description || ""} onChange={(e) => handleUpdateField("description", e.target.value)} />
+              ) : (
+                 <p className="line-clamp-4 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.description}</p>
+              )}
             </div>
 
             <div>
               <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Personality</span>
-              <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.personality}</p>
+              {isEditing ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-24 resize-none" value={character.personality || ""} onChange={(e) => handleUpdateField("personality", e.target.value)} />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.personality}</p>
+              )}
             </div>
 
             <div>
               <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Scenario</span>
-              <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.scenario}</p>
+              {isEditing ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-20 resize-none" value={character.scenario || ""} onChange={(e) => handleUpdateField("scenario", e.target.value)} />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.scenario}</p>
+              )}
             </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">First Message</span>
+              {isEditing ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-32 resize-none" value={character.first_mes || ""} onChange={(e) => handleUpdateField("first_mes", e.target.value)} />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.first_mes}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Message Example</span>
+              {isEditing ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-32 resize-none" value={character.mes_example || ""} onChange={(e) => handleUpdateField("mes_example", e.target.value)} />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.mes_example || "None"}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">System Prompt</span>
+              {isEditing ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-24 resize-none" value={character.system_prompt || ""} onChange={(e) => handleUpdateField("system_prompt", e.target.value)} />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.system_prompt || "None"}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Post History Instructions</span>
+              {isEditing ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-24 resize-none" value={character.post_history_instructions || ""} onChange={(e) => handleUpdateField("post_history_instructions", e.target.value)} />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.post_history_instructions || "None"}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Creator Notes</span>
+              {isEditing ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-20 resize-none" value={character.creator_notes || ""} onChange={(e) => handleUpdateField("creator_notes", e.target.value)} />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.creator_notes || "None"}</p>
+              )}
+            </div>
+
+            {/* Arrays/Objects section (Basic implementation) */}
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Alternate Greetings (JSON Array)</span>
+              {isEditing && editJsonState ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-20 resize-none font-mono text-xs"
+                    value={editJsonState.alternate_greetings}
+                    onChange={(e) => setEditJsonState(prev => prev ? {...prev, alternate_greetings: e.target.value} : null)}
+                 />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.alternate_greetings?.length ? `[${character.alternate_greetings.length} greetings]` : "None"}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Group Only Greetings (V3 - JSON Array)</span>
+              {isEditing && editJsonState ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-20 resize-none font-mono text-xs"
+                    value={editJsonState.group_only_greetings}
+                    onChange={(e) => setEditJsonState(prev => prev ? {...prev, group_only_greetings: e.target.value} : null)}
+                 />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.group_only_greetings?.length ? `[${character.group_only_greetings.length} greetings]` : "None"}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Tags (JSON Array)</span>
+              {isEditing && editJsonState ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-20 resize-none font-mono text-xs"
+                    value={editJsonState.tags}
+                    onChange={(e) => setEditJsonState(prev => prev ? {...prev, tags: e.target.value} : null)}
+                 />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.tags?.length ? character.tags.join(", ") : "None"}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Creator</span>
+              {isEditing ? (
+                 <input className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none" value={character.creator || ""} onChange={(e) => handleUpdateField("creator", e.target.value)} />
+              ) : (
+                 <p className="bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.creator || "N/A"}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Character Version</span>
+              {isEditing ? (
+                 <input className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none" value={character.character_version || ""} onChange={(e) => handleUpdateField("character_version", e.target.value)} />
+              ) : (
+                 <p className="bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.character_version || "N/A"}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Creator Notes Multilingual (V3 - JSON)</span>
+              {isEditing && editJsonState ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-24 resize-none font-mono text-xs"
+                    value={editJsonState.creator_notes_multilingual}
+                    onChange={(e) => setEditJsonState(prev => prev ? {...prev, creator_notes_multilingual: e.target.value} : null)}
+                 />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.creator_notes_multilingual && Object.keys(character.creator_notes_multilingual).length > 0 ? "Configured" : "None"}</p>
+              )}
+            </div>
+
+            <div>
+              <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Source (V3 - JSON Array)</span>
+              {isEditing && editJsonState ? (
+                 <textarea className="w-full bg-zinc-900 text-zinc-100 p-2 rounded-lg border border-zinc-700 focus:border-amber-500 outline-none h-20 resize-none font-mono text-xs"
+                    value={editJsonState.source}
+                    onChange={(e) => setEditJsonState(prev => prev ? {...prev, source: e.target.value} : null)}
+                 />
+              ) : (
+                 <p className="line-clamp-3 hover:line-clamp-none transition-all duration-300 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{character.source?.length ? character.source.join(", ") : "None"}</p>
+              )}
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-1">
+                 <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Creation Date (V3)</span>
+                 <p className="bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50 text-xs">{character.creation_date ? new Date(character.creation_date * 1000).toLocaleString() : "N/A"}</p>
+              </div>
+              <div className="flex-1">
+                 <span className="text-amber-500 font-semibold block mb-1 text-xs uppercase tracking-wider">Modification Date (V3)</span>
+                 <p className="bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50 text-xs">{character.modification_date ? new Date(character.modification_date * 1000).toLocaleString() : "N/A"}</p>
+              </div>
+            </div>
+
           </div>
 
-          <div className="mt-auto pt-4 border-t border-zinc-800">
+          <div className="mt-auto pt-4 border-t border-zinc-800 flex gap-2">
              <button
-                onClick={() => exportCharacterCard(character)}
-                className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-colors text-sm font-medium flex items-center justify-center gap-2">
-                <i className="ph ph-download-simple"></i> Export Card (PNG/JSON)
+                onClick={() => exportCharacterCard(character, 'v2')}
+                className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-colors text-sm font-medium flex items-center justify-center gap-2">
+                <i className="ph ph-download-simple"></i> Export V2
+             </button>
+             <button
+                onClick={() => exportCharacterCard(character, 'v3')}
+                className="flex-1 py-2.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-500 border border-amber-500/30 rounded-xl transition-colors text-sm font-medium flex items-center justify-center gap-2">
+                <i className="ph ph-download-simple"></i> Export V3
              </button>
           </div>
         </div>
