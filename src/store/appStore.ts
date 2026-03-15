@@ -33,6 +33,7 @@ interface AppState {
   setCurrentView: (view: View) => void;
   updateSettings: (newSettings: Partial<Settings>) => void;
   addCharacter: (character: CharacterCard) => void;
+  updateCharacterAvatar: (id: string, avatarUrl: string) => void;
   setActiveCharacter: (id: string | null) => void;
 }
 
@@ -51,5 +52,11 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({ settings: { ...state.settings, ...newSettings } })),
   addCharacter: (character) =>
     set((state) => ({ characters: [...state.characters, character] })),
+  updateCharacterAvatar: (id, avatarUrl) =>
+    set((state) => ({
+      characters: state.characters.map((char) =>
+        char.id === id ? { ...char, avatarUrl } : char
+      ),
+    })),
   setActiveCharacter: (id) => set({ activeCharacterId: id }),
 }));
