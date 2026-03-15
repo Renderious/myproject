@@ -4,7 +4,7 @@ export type View = 'forge' | 'lab' | 'barracks';
 
 export interface Settings {
   ollamaUrl: string;
-  comfyUiUrl: string;
+  sdUrl: string;
   model: string;
 }
 
@@ -40,7 +40,7 @@ export const useAppStore = create<AppState>((set) => ({
   currentView: 'forge',
   settings: {
     ollamaUrl: 'http://localhost:11434',
-    comfyUiUrl: 'http://localhost:8188',
+    sdUrl: 'http://127.0.0.1:7860',
     model: '', // Will be populated from the API
   },
   characters: [],
