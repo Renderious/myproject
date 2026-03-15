@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export type View = 'forge' | 'lab' | 'barracks';
 
@@ -37,26 +38,34 @@ interface AppState {
   setActiveCharacter: (id: string | null) => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  currentView: 'forge',
-  settings: {
-    ollamaUrl: 'http://localhost:11434',
-    sdUrl: 'http://127.0.0.1:7860',
-    model: '', // Will be populated from the API
-  },
-  characters: [],
-  activeCharacterId: null,
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      currentView: 'forge',
+      settings: {
+        ollamaUrl: 'http://localhost:11434',
+        sdUrl: 'http://127.0.0.1:7860',
+        model: '', // Will be populated from the API
+      },
+      characters: [],
+      activeCharacterId: null,
 
-  setCurrentView: (view) => set({ currentView: view }),
-  updateSettings: (newSettings) =>
-    set((state) => ({ settings: { ...state.settings, ...newSettings } })),
-  addCharacter: (character) =>
-    set((state) => ({ characters: [...state.characters, character] })),
-  updateCharacterAvatar: (id, avatarUrl) =>
-    set((state) => ({
-      characters: state.characters.map((char) =>
-        char.id === id ? { ...char, avatarUrl } : char
-      ),
-    })),
-  setActiveCharacter: (id) => set({ activeCharacterId: id }),
-}));
+      setCurrentView: (view) => set({ currentView: view }),
+      updateSettings: (newSettings) =>
+        set((state) => ({ settings: { ...state.settings, ...newSettings } })),
+      addCharacter: (character) =>
+        set((state) => ({ characters: [...state.characters, character] })),
+      updateCharacterAvatar: (id, avatarUrl) =>
+        set((state) => ({
+          characters: state.characters.map((char) =>
+            char.id === id ? { ...char, avatarUrl } : char
+          ),
+        })),
+      setActiveCharacter: (id) => set({ activeCharacterId: id }),
+    }),
+    {
+      name: 'persona-forge-storage', // name of the item in the storage (must be unique)
+      partialize: (state) => ({ characters: state.characters }), // only persist characters
+    }
+  )
+);
