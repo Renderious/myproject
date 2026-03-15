@@ -39,3 +39,48 @@ body {
 .forge-input-focus {
   animation: forge-pulse 4s infinite;
 }
+
+@keyframes hammer {
+  0% { transform: rotate(-45deg); }
+  50% { transform: rotate(15deg); }
+  100% { transform: rotate(-45deg); }
+}
+
+@keyframes spark-1 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-20px, -30px) scale(0); opacity: 0; }
+}
+
+@keyframes spark-2 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(15px, -25px) scale(0); opacity: 0; }
+}
+
+@keyframes spark-3 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-10px, -40px) scale(0); opacity: 0; }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.3s ease-out forwards;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Hide scrollbar for Lab View sidebar but keep functionality */
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
