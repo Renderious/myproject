@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useAppStore } from "@/store/appStore";
-import { chatWithLLM } from "@/lib/llm";
+import { chatWithLLM, generateJSONWithLLM } from "@/lib/llm";
+import { generateImage } from "@/lib/sd";
 import { exportCharacterCard } from "@/lib/export";
+import { cropImageToSquare } from "@/lib/imageUtils";
 
 interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -9,13 +11,16 @@ interface ChatMessage {
 }
 
 export function LabView() {
-  const { characters, activeCharacterId, settings } = useAppStore();
+  const { characters, activeCharacterId, settings, updateCharacterAvatar } = useAppStore();
   const character = characters.find(c => c.id === activeCharacterId);
 
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [isRegeneratingAvatar, setIsRegeneratingAvatar] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize chat when character changes
   useEffect(() => {
@@ -58,6 +63,66 @@ export function LabView() {
       </div>
     );
   }
+
+  const handleRegenerateAvatar = async () => {
+    if (!settings.model) {
+      alert("Please select a model in the System Config first.");
+      return;
+    }
+
+    setIsRegeneratingAvatar(true);
+    try {
+      const jsonPrompt = `Based on the following character properties, generate a detailed Stable Diffusion prompt for their visual appearance (comma separated tags, style, lighting. E.g. "1girl, cinematic lighting, cyberpunk city, highly detailed, sharp focus, vibrant colors").
+Name: ${character.name}
+Description: ${character.description}
+Personality: ${character.personality}
+Scenario: ${character.scenario}
+
+Output ONLY valid JSON in this format: { "sd_prompt": "your prompt here" }`;
+
+      const jsonMessages: ChatMessage[] = [
+        { role: "user" as const, content: jsonPrompt }
+      ];
+
+      const characterData = await generateJSONWithLLM(settings, jsonMessages);
+
+      if (characterData.sd_prompt) {
+        console.log("Regenerating image with new prompt:", characterData.sd_prompt);
+        const imgUrl = await generateImage(settings, characterData.sd_prompt);
+        if (imgUrl) {
+          updateCharacterAvatar(character.id, imgUrl);
+        } else {
+          alert("Image generation failed. Check the server logs.");
+        }
+      } else {
+        alert("Failed to generate a new SD prompt.");
+      }
+    } catch (error) {
+      console.error("Avatar regeneration failed:", error);
+      alert("An error occurred while regenerating the avatar.");
+    } finally {
+      setIsRegeneratingAvatar(false);
+    }
+  };
+
+  const handleUploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      const croppedBase64 = await cropImageToSquare(file);
+      updateCharacterAvatar(character.id, croppedBase64);
+    } catch (error) {
+      console.error("Avatar upload failed:", error);
+      alert("An error occurred while uploading the avatar.");
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""; // Reset input
+      }
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isTyping) return;
@@ -107,14 +172,51 @@ export function LabView() {
              />
           )}
 
-          <div className="relative w-32 h-32 rounded-2xl overflow-hidden bg-zinc-800 border-2 border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.2)] mb-4 shrink-0">
-            {character.avatarUrl ? (
-              <img src={character.avatarUrl} alt={character.name} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <i className="ph ph-user text-4xl text-zinc-600"></i>
-              </div>
-            )}
+          <div className="relative mb-4 shrink-0 flex items-center gap-4">
+            <div className="relative w-32 h-32 rounded-2xl overflow-hidden bg-zinc-800 border-2 border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+              {character.avatarUrl ? (
+                <img src={character.avatarUrl} alt={character.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <i className="ph ph-user text-4xl text-zinc-600"></i>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 z-10">
+              <button
+                onClick={handleRegenerateAvatar}
+                disabled={isRegeneratingAvatar || isUploadingAvatar}
+                className="w-10 h-10 flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700/80 text-amber-400 rounded-xl transition-colors border border-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                title="Regenerate Avatar"
+              >
+                {isRegeneratingAvatar ? (
+                  <i className="ph ph-spinner animate-spin text-xl"></i>
+                ) : (
+                  <i className="ph ph-arrows-clockwise text-xl"></i>
+                )}
+              </button>
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isRegeneratingAvatar || isUploadingAvatar}
+                className="w-10 h-10 flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700/80 text-amber-400 rounded-xl transition-colors border border-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                title="Upload Avatar"
+              >
+                {isUploadingAvatar ? (
+                  <i className="ph ph-spinner animate-spin text-xl"></i>
+                ) : (
+                  <i className="ph ph-upload-simple text-xl"></i>
+                )}
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleUploadAvatar}
+                accept="image/*"
+                className="hidden"
+              />
+            </div>
           </div>
           <h2 className="text-2xl font-bold text-amber-400 relative z-10">{character.name}</h2>
           <div className="flex items-center gap-2 mt-2 text-xs font-bold uppercase tracking-widest text-zinc-500 relative z-10">
