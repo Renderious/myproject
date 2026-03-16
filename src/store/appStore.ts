@@ -37,6 +37,7 @@ export interface CharacterCard {
   extensions?: Record<string, any>;
 
   avatarUrl?: string; // Stored as a blob URL or base64 for now
+  last_sd_prompt?: string;
 }
 
 interface AppState {

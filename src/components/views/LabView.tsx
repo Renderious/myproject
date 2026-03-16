@@ -21,6 +21,10 @@ export function LabView() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
+  // Expanded Image View state
+  const [isImageExpanded, setIsImageExpanded] = useState(false);
+  const [expandedPromptText, setExpandedPromptText] = useState("");
+
   // Local state for complex JSON fields to allow typing invalid JSON temporarily
   const [editJsonState, setEditJsonState] = useState<{
      alternate_greetings: string;
@@ -118,11 +122,44 @@ Output ONLY valid JSON in this format: { "sd_prompt": "your prompt here" }`;
         const imgUrl = await generateImage(settings, characterData.sd_prompt);
         if (imgUrl) {
           updateCharacterAvatar(character.id, imgUrl);
+          updateCharacter(character.id, { last_sd_prompt: characterData.sd_prompt });
+
+          // If the user happens to have the expanded view open and triggers a regenerate
+          // from the sidebar (or if it's their first time and we want to auto-fill it),
+          // update the local expanded prompt text as well
+          setExpandedPromptText(characterData.sd_prompt);
         } else {
           alert("Image generation failed. Check the server logs.");
         }
       } else {
         alert("Failed to generate a new SD prompt.");
+      }
+    } catch (error) {
+      console.error("Avatar regeneration failed:", error);
+      alert("An error occurred while regenerating the avatar.");
+    } finally {
+      setIsRegeneratingAvatar(false);
+    }
+  };
+
+  const handleRegenerateFromPrompt = async () => {
+    if (!settings.model) {
+      alert("Please select a model in the System Config first.");
+      return;
+    }
+    if (!expandedPromptText.trim()) {
+      alert("Prompt cannot be empty.");
+      return;
+    }
+    setIsRegeneratingAvatar(true);
+    try {
+      console.log("Regenerating image with edited prompt:", expandedPromptText);
+      const imgUrl = await generateImage(settings, expandedPromptText);
+      if (imgUrl) {
+        updateCharacterAvatar(character.id, imgUrl);
+        updateCharacter(character.id, { last_sd_prompt: expandedPromptText });
+      } else {
+        alert("Image generation failed. Check the server logs.");
       }
     } catch (error) {
       console.error("Avatar regeneration failed:", error);
@@ -198,64 +235,88 @@ Output ONLY valid JSON in this format: { "sd_prompt": "your prompt here" }`;
       <div className="w-full md:w-1/3 flex flex-col gap-4 overflow-y-auto pr-2 pb-4 hide-scrollbar">
         <div className="glass-panel p-6 rounded-2xl border border-zinc-800 flex flex-col items-center text-center shadow-lg relative overflow-hidden group">
           {/* Background blurred avatar */}
-          {character.avatarUrl && (
+          {character.avatarUrl && !isImageExpanded && (
              <div
                className="absolute inset-0 bg-cover bg-center opacity-20 blur-xl group-hover:opacity-30 transition-opacity"
                style={{ backgroundImage: `url(${character.avatarUrl})` }}
              />
           )}
 
-          <div className="relative mb-4 shrink-0 flex items-center gap-4">
-            <div className="relative w-32 h-32 rounded-2xl overflow-hidden bg-zinc-800 border-2 border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
-              {character.avatarUrl ? (
-                <img src={character.avatarUrl} alt={character.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <i className="ph ph-user text-4xl text-zinc-600"></i>
-                </div>
-              )}
-            </div>
+          {isImageExpanded ? (
+             <div
+               className="w-full flex flex-col items-center justify-center py-8 cursor-pointer hover:bg-zinc-800/50 rounded-xl transition-colors border border-dashed border-zinc-700 hover:border-amber-500/50"
+               onClick={() => setIsImageExpanded(false)}
+             >
+               <i className="ph ph-arrow-u-up-left text-4xl text-amber-500 mb-2"></i>
+               <span className="text-sm font-bold text-zinc-400">Return to Chat</span>
+             </div>
+          ) : (
+             <>
+               <div className="relative mb-4 shrink-0 flex items-center gap-4">
+                 <div className="relative w-32 h-32 rounded-2xl overflow-hidden bg-zinc-800 border-2 border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.2)] group/avatar">
+                   {character.avatarUrl ? (
+                     <img src={character.avatarUrl} alt={character.name} className="w-full h-full object-cover" />
+                   ) : (
+                     <div className="w-full h-full flex items-center justify-center">
+                       <i className="ph ph-user text-4xl text-zinc-600"></i>
+                     </div>
+                   )}
+                   <button
+                     onClick={() => {
+                        setIsImageExpanded(true);
+                        setExpandedPromptText(character.last_sd_prompt || "");
+                     }}
+                     className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-black/80 text-white rounded-lg opacity-0 group-hover/avatar:opacity-100 transition-opacity border border-white/20 shadow-lg"
+                     title="Expand Image"
+                   >
+                     <i className="ph ph-arrows-out text-lg"></i>
+                   </button>
+                 </div>
 
-            <div className="flex flex-col gap-2 z-10">
-              <button
-                onClick={handleRegenerateAvatar}
-                disabled={isRegeneratingAvatar || isUploadingAvatar}
-                className="w-10 h-10 flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700/80 text-amber-400 rounded-xl transition-colors border border-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-                title="Regenerate Avatar"
-              >
-                {isRegeneratingAvatar ? (
-                  <i className="ph ph-spinner animate-spin text-xl"></i>
-                ) : (
-                  <i className="ph ph-arrows-clockwise text-xl"></i>
-                )}
-              </button>
+                 <div className="flex flex-col gap-2 z-10">
+                   <button
+                     onClick={handleRegenerateAvatar}
+                     disabled={isRegeneratingAvatar || isUploadingAvatar}
+                     className="w-10 h-10 flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700/80 text-amber-400 rounded-xl transition-colors border border-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                     title="Regenerate Avatar"
+                   >
+                     {isRegeneratingAvatar ? (
+                       <i className="ph ph-spinner animate-spin text-xl"></i>
+                     ) : (
+                       <i className="ph ph-arrows-clockwise text-xl"></i>
+                     )}
+                   </button>
 
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isRegeneratingAvatar || isUploadingAvatar}
-                className="w-10 h-10 flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700/80 text-amber-400 rounded-xl transition-colors border border-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-                title="Upload Avatar"
-              >
-                {isUploadingAvatar ? (
-                  <i className="ph ph-spinner animate-spin text-xl"></i>
-                ) : (
-                  <i className="ph ph-upload-simple text-xl"></i>
-                )}
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleUploadAvatar}
-                accept="image/*"
-                className="hidden"
-              />
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold text-amber-400 relative z-10">{character.name}</h2>
-          <div className="flex items-center gap-2 mt-2 text-xs font-bold uppercase tracking-widest text-zinc-500 relative z-10">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            Online
-          </div>
+                   <button
+                     onClick={() => fileInputRef.current?.click()}
+                     disabled={isRegeneratingAvatar || isUploadingAvatar}
+                     className="w-10 h-10 flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700/80 text-amber-400 rounded-xl transition-colors border border-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                     title="Upload Avatar"
+                   >
+                     {isUploadingAvatar ? (
+                       <i className="ph ph-spinner animate-spin text-xl"></i>
+                     ) : (
+                       <i className="ph ph-upload-simple text-xl"></i>
+                     )}
+                   </button>
+                 </div>
+               </div>
+               <h2 className="text-2xl font-bold text-amber-400 relative z-10">{character.name}</h2>
+               <div className="flex items-center gap-2 mt-2 text-xs font-bold uppercase tracking-widest text-zinc-500 relative z-10">
+                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                 Online
+               </div>
+             </>
+          )}
+
+          {/* Hidden file input for both views */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleUploadAvatar}
+            accept="image/*"
+            className="hidden"
+          />
         </div>
 
         <div className="glass-panel p-5 rounded-2xl border border-zinc-800 flex-1 flex flex-col gap-4 overflow-y-auto">
@@ -488,92 +549,195 @@ Output ONLY valid JSON in this format: { "sd_prompt": "your prompt here" }`;
         </div>
       </div>
 
-      {/* Chat Interface */}
+      {/* Right Side: Chat Interface OR Expanded Image View */}
       <div className="flex-1 glass-panel border border-zinc-800 rounded-2xl flex flex-col overflow-hidden shadow-2xl relative">
-        {/* Header */}
-        <div className="p-4 border-b border-zinc-800 flex items-center gap-3 bg-zinc-900/50">
-          <i className="ph ph-flask text-2xl text-amber-500"></i>
-          <div>
-            <h3 className="font-bold text-zinc-100 leading-tight">Test Environment</h3>
-            <p className="text-xs text-zinc-500">Interact with {character.name} to evaluate their responses.</p>
-          </div>
-        </div>
+        {isImageExpanded ? (
+          <div className="flex flex-col h-full bg-zinc-900/80">
+            {/* Header */}
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
+              <div className="flex items-center gap-3">
+                <i className="ph ph-image text-2xl text-amber-500"></i>
+                <div>
+                  <h3 className="font-bold text-zinc-100 leading-tight">Expanded Preview</h3>
+                  <p className="text-xs text-zinc-500">View and regenerate {character.name}'s avatar.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsImageExpanded(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+              >
+                <i className="ph ph-x text-lg"></i>
+              </button>
+            </div>
 
-        {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.filter(m => m.role !== 'system').map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex gap-3 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-
-                {/* Avatar */}
-                <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-zinc-800 border border-zinc-700 flex items-center justify-center mt-1">
-                   {msg.role === 'user' ? (
-                       <i className="ph ph-user text-zinc-400"></i>
-                   ) : character.avatarUrl ? (
-                       <img src={character.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                   ) : (
-                       <i className="ph ph-robot text-amber-500"></i>
-                   )}
+            {/* Large Image Area */}
+            <div className="flex-1 flex items-center justify-center p-8 overflow-hidden relative">
+              <div className="relative max-h-full max-w-full flex items-center gap-6">
+                <div className="relative aspect-square max-h-[60vh] rounded-2xl overflow-hidden bg-zinc-800 border-2 border-amber-500/30 shadow-[0_0_40px_rgba(245,158,11,0.15)] flex-shrink-0">
+                  {character.avatarUrl ? (
+                    <img src={character.avatarUrl} alt={character.name} className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center min-w-[300px]">
+                      <i className="ph ph-image-broken text-6xl text-zinc-600"></i>
+                    </div>
+                  )}
                 </div>
 
-                {/* Bubble */}
-                <div className={`p-4 rounded-2xl ${
-                  msg.role === 'user'
-                    ? 'bg-amber-600/20 border border-amber-500/30 text-zinc-100 rounded-tr-sm'
-                    : 'bg-zinc-800/80 border border-zinc-700/50 text-zinc-300 rounded-tl-sm shadow-lg whitespace-pre-wrap'
-                }`}>
-                  {msg.content}
+                {/* Actions next to the large image */}
+                <div className="flex flex-col gap-4 z-10 shrink-0">
+                  <button
+                    onClick={handleRegenerateFromPrompt}
+                    disabled={isRegeneratingAvatar || isUploadingAvatar}
+                    className="w-14 h-14 flex items-center justify-center bg-zinc-800/90 hover:bg-zinc-700/90 text-amber-400 rounded-2xl transition-colors border border-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                    title="Regenerate Avatar"
+                  >
+                    {isRegeneratingAvatar ? (
+                      <i className="ph ph-spinner animate-spin text-3xl"></i>
+                    ) : (
+                      <i className="ph ph-arrows-clockwise text-3xl"></i>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isRegeneratingAvatar || isUploadingAvatar}
+                    className="w-14 h-14 flex items-center justify-center bg-zinc-800/90 hover:bg-zinc-700/90 text-amber-400 rounded-2xl transition-colors border border-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                    title="Upload Avatar"
+                  >
+                    {isUploadingAvatar ? (
+                      <i className="ph ph-spinner animate-spin text-3xl"></i>
+                    ) : (
+                      <i className="ph ph-upload-simple text-3xl"></i>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
-          ))}
 
-          {isTyping && (
-            <div className="flex justify-start">
-               <div className="flex gap-3 max-w-[85%]">
-                  <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-zinc-800 border border-zinc-700 flex items-center justify-center mt-1">
-                     {character.avatarUrl ? (
-                         <img src={character.avatarUrl} alt="Avatar" className="w-full h-full object-cover opacity-50" />
-                     ) : (
-                         <i className="ph ph-robot text-amber-500 opacity-50"></i>
-                     )}
-                  </div>
-                  <div className="p-4 rounded-2xl bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 rounded-tl-sm flex items-center gap-1.5 h-12">
-                     <span className="w-2 h-2 rounded-full bg-amber-500/50 animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                     <span className="w-2 h-2 rounded-full bg-amber-500/50 animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                     <span className="w-2 h-2 rounded-full bg-amber-500/50 animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                  </div>
-               </div>
+            {/* Prompt Editor (Replaces Chat Input) */}
+            <div className="p-4 bg-zinc-900/90 border-t border-zinc-800">
+              <div className="mb-2 flex justify-between items-center">
+                 <span className="text-xs font-bold uppercase tracking-wider text-amber-500 ml-1">Generation Prompt</span>
+              </div>
+              <div className="flex items-end gap-2 bg-zinc-950 border border-zinc-800 rounded-xl p-2 focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/50 transition-all shadow-inner">
+                <textarea
+                  value={expandedPromptText}
+                  onChange={(e) => setExpandedPromptText(e.target.value)}
+                  onKeyDown={(e) => {
+                     if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (expandedPromptText.trim() && !isRegeneratingAvatar) {
+                           handleRegenerateFromPrompt();
+                        }
+                     }
+                  }}
+                  placeholder="Enter a Stable Diffusion prompt..."
+                  className="flex-1 bg-transparent text-zinc-100 placeholder-zinc-500 resize-none outline-none py-2 px-3 max-h-48 overflow-y-auto min-h-[80px]"
+                  disabled={isRegeneratingAvatar}
+                />
+                <button
+                  onClick={() => {
+                     if (expandedPromptText.trim() && !isRegeneratingAvatar) {
+                         handleRegenerateFromPrompt();
+                     }
+                  }}
+                  disabled={isRegeneratingAvatar || !expandedPromptText.trim()}
+                  className="p-3 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded-xl transition-colors shadow-lg mb-0.5 shrink-0 flex items-center justify-center gap-2"
+                >
+                  <i className="ph ph-magic-wand text-xl"></i>
+                  <span className="font-bold hidden sm:inline">Generate</span>
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* Input */}
-        <div className="p-4 bg-zinc-900/80 border-t border-zinc-800">
-          <div className="flex items-end gap-2 bg-zinc-950 border border-zinc-800 rounded-xl p-2 focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/50 transition-all">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                 if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                 }
-              }}
-              placeholder={`Send a message to ${character.name}...`}
-              className="flex-1 bg-transparent text-zinc-100 placeholder-zinc-500 resize-none outline-none py-2 px-2 max-h-32 overflow-y-auto"
-              rows={1}
-              disabled={isTyping}
-            />
-            <button
-              onClick={handleSend}
-              disabled={isTyping || !input.trim()}
-              className="p-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded-lg transition-colors shadow-lg mb-0.5 shrink-0"
-            >
-              <i className="ph ph-paper-plane-right text-xl"></i>
-            </button>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Chat Interface Header */}
+            <div className="p-4 border-b border-zinc-800 flex items-center gap-3 bg-zinc-900/50">
+              <i className="ph ph-flask text-2xl text-amber-500"></i>
+              <div>
+                <h3 className="font-bold text-zinc-100 leading-tight">Test Environment</h3>
+                <p className="text-xs text-zinc-500">Interact with {character.name} to evaluate their responses.</p>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.filter(m => m.role !== 'system').map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`flex gap-3 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+
+                    {/* Avatar */}
+                    <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-zinc-800 border border-zinc-700 flex items-center justify-center mt-1">
+                       {msg.role === 'user' ? (
+                           <i className="ph ph-user text-zinc-400"></i>
+                       ) : character.avatarUrl ? (
+                           <img src={character.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                       ) : (
+                           <i className="ph ph-robot text-amber-500"></i>
+                       )}
+                    </div>
+
+                    {/* Bubble */}
+                    <div className={`p-4 rounded-2xl ${
+                      msg.role === 'user'
+                        ? 'bg-amber-600/20 border border-amber-500/30 text-zinc-100 rounded-tr-sm'
+                        : 'bg-zinc-800/80 border border-zinc-700/50 text-zinc-300 rounded-tl-sm shadow-lg whitespace-pre-wrap'
+                    }`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {isTyping && (
+                <div className="flex justify-start">
+                   <div className="flex gap-3 max-w-[85%]">
+                      <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-zinc-800 border border-zinc-700 flex items-center justify-center mt-1">
+                         {character.avatarUrl ? (
+                             <img src={character.avatarUrl} alt="Avatar" className="w-full h-full object-cover opacity-50" />
+                         ) : (
+                             <i className="ph ph-robot text-amber-500 opacity-50"></i>
+                         )}
+                      </div>
+                      <div className="p-4 rounded-2xl bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 rounded-tl-sm flex items-center gap-1.5 h-12">
+                         <span className="w-2 h-2 rounded-full bg-amber-500/50 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                         <span className="w-2 h-2 rounded-full bg-amber-500/50 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                         <span className="w-2 h-2 rounded-full bg-amber-500/50 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                      </div>
+                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input */}
+            <div className="p-4 bg-zinc-900/80 border-t border-zinc-800">
+              <div className="flex items-end gap-2 bg-zinc-950 border border-zinc-800 rounded-xl p-2 focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/50 transition-all">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                     if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                     }
+                  }}
+                  placeholder={`Send a message to ${character.name}...`}
+                  className="flex-1 bg-transparent text-zinc-100 placeholder-zinc-500 resize-none outline-none py-2 px-2 max-h-32 overflow-y-auto"
+                  rows={1}
+                  disabled={isTyping}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={isTyping || !input.trim()}
+                  className="p-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded-lg transition-colors shadow-lg mb-0.5 shrink-0"
+                >
+                  <i className="ph ph-paper-plane-right text-xl"></i>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
     </div>
