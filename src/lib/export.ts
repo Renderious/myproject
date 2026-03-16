@@ -5,19 +5,37 @@ import { addMetadataFromBase64DataURI } from "meta-png";
 const FALLBACK_PNG_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 /**
- * Embeds a Character Card as JSON into a PNG (as tEXt chunk with keyword "chara")
+ * Embeds a Character Card as JSON into a PNG (as tEXt chunk)
  * and triggers a download of the modified PNG file.
  *
  * @param character The character object to export.
+ * @param format Whether to export as a V2 or V3 card.
  */
-export async function exportCharacterCard(character: CharacterCard) {
+export async function exportCharacterCard(character: CharacterCard, format: 'v2' | 'v3' = 'v2') {
   // We need to omit any internal application state from the exported card if there is any,
   // but let's keep it mostly intact, just removing avatarUrl which we use for display
   const { avatarUrl, ...exportData } = character;
 
-  // The V3 standard embeds the entire JSON structure in a 'chara' keyword text chunk, base64 encoded.
-  const charaJsonString = JSON.stringify(exportData);
-  const charaBase64 = btoa(unescape(encodeURIComponent(charaJsonString))); // Handle utf-8 to base64
+  // The V3 standard embeds the entire JSON structure in a 'ccv3' keyword text chunk, base64 encoded.
+  // The V2 standard embeds it in a 'chara' chunk.
+
+  let finalJsonString = "";
+  let chunkKeyword = "";
+
+  if (format === 'v3') {
+    chunkKeyword = "ccv3";
+    const v3Data = {
+      spec: "chara_card_v3",
+      spec_version: "3.0",
+      data: exportData
+    };
+    finalJsonString = JSON.stringify(v3Data);
+  } else {
+    chunkKeyword = "chara";
+    finalJsonString = JSON.stringify(exportData);
+  }
+
+  const charaBase64 = btoa(unescape(encodeURIComponent(finalJsonString))); // Handle utf-8 to base64
 
   let sourceImageBase64 = FALLBACK_PNG_BASE64;
 
@@ -50,9 +68,9 @@ export async function exportCharacterCard(character: CharacterCard) {
   }
 
   try {
-    // Add the "chara" metadata using meta-png
+    // Add the metadata using meta-png
     // addMetadataFromBase64DataURI takes (dataUri, keyword, text)
-    const newBase64DataUri = addMetadataFromBase64DataURI(sourceImageBase64, "chara", charaBase64);
+    const newBase64DataUri = addMetadataFromBase64DataURI(sourceImageBase64, chunkKeyword, charaBase64);
 
     // Create a temporary link to download the file
     const link = document.createElement("a");

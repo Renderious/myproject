@@ -22,6 +22,20 @@ export interface CharacterCard {
   post_history_instructions: string;
   alternate_greetings: string[];
   character_book?: unknown;
+
+  // V3 specific fields and other missing V2 fields
+  nickname?: string;
+  creator_notes_multilingual?: Record<string, string>;
+  source?: string[];
+  group_only_greetings?: string[];
+  creation_date?: number;
+  modification_date?: number;
+  assets?: Array<{ type: string; uri: string; name: string; ext: string }>;
+  tags?: string[];
+  creator?: string;
+  character_version?: string;
+  extensions?: Record<string, any>;
+
   avatarUrl?: string; // Stored as a blob URL or base64 for now
 }
 
@@ -34,6 +48,7 @@ interface AppState {
   setCurrentView: (view: View) => void;
   updateSettings: (newSettings: Partial<Settings>) => void;
   addCharacter: (character: CharacterCard) => void;
+  updateCharacter: (id: string, updates: Partial<CharacterCard>) => void;
   updateCharacterAvatar: (id: string, avatarUrl: string) => void;
   setActiveCharacter: (id: string | null) => void;
 }
@@ -55,6 +70,12 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ settings: { ...state.settings, ...newSettings } })),
       addCharacter: (character) =>
         set((state) => ({ characters: [...state.characters, character] })),
+      updateCharacter: (id, updates) =>
+        set((state) => ({
+          characters: state.characters.map((char) =>
+            char.id === id ? { ...char, ...updates, modification_date: Math.floor(Date.now() / 1000) } : char
+          ),
+        })),
       updateCharacterAvatar: (id, avatarUrl) =>
         set((state) => ({
           characters: state.characters.map((char) =>
