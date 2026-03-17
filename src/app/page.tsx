@@ -83,7 +83,17 @@ export default function Home() {
 
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-[url('/bg.png')] bg-cover bg-center bg-no-repeat">
+      <main className="flex-1 flex flex-col relative overflow-hidden">
+        {/* Background Video */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover z-0"
+        >
+          <source src="/bgvid.mp4" type="video/mp4" />
+        </video>
 
         {/* Gradient Overlay for bottom visibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none z-0"></div>
@@ -95,7 +105,7 @@ export default function Home() {
           <i className="ph ph-plus text-2xl cursor-pointer text-zinc-400" onClick={() => setCurrentView('forge')}></i>
         </header>
 
-        <div className="flex-1 overflow-hidden flex flex-col items-center p-6 md:p-12 w-full">
+        <div className="relative z-10 flex-1 overflow-hidden flex flex-col items-center p-6 md:p-12 w-full">
           {currentView === 'forge' && <ForgeView />}
           {currentView === 'lab' && <LabView />}
           {currentView === 'barracks' && <BarracksView />}
