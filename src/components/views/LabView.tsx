@@ -20,6 +20,7 @@ export function LabView() {
   const [isRegeneratingAvatar, setIsRegeneratingAvatar] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'v2' | 'v3' | 'markdown'>('v2');
 
   // Expanded Image View state
   const [isImageExpanded, setIsImageExpanded] = useState(false);
@@ -535,15 +536,20 @@ Output ONLY valid JSON in this format: { "sd_prompt": "your prompt here" }`;
           </div>
 
           <div className="mt-auto pt-4 border-t border-zinc-800 flex gap-2">
+             <select
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value as 'v2' | 'v3' | 'markdown')}
+                className="bg-zinc-900 border border-zinc-700 text-zinc-300 rounded-xl px-3 py-2.5 outline-none focus:border-amber-500 transition-colors text-sm font-medium appearance-none min-w-[120px]"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: `right 0.5rem center`, backgroundRepeat: `no-repeat`, backgroundSize: `1.5em 1.5em`, paddingRight: `2.5rem` }}
+             >
+                <option value="v2">V2 Card (PNG)</option>
+                <option value="v3">V3 Card (PNG)</option>
+                <option value="markdown">Markdown (.md)</option>
+             </select>
              <button
-                onClick={() => exportCharacterCard(character, 'v2')}
-                className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-colors text-sm font-medium flex items-center justify-center gap-2">
-                <i className="ph ph-download-simple"></i> Export V2
-             </button>
-             <button
-                onClick={() => exportCharacterCard(character, 'v3')}
-                className="flex-1 py-2.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-500 border border-amber-500/30 rounded-xl transition-colors text-sm font-medium flex items-center justify-center gap-2">
-                <i className="ph ph-download-simple"></i> Export V3
+                onClick={() => exportCharacterCard(character, exportFormat as 'v2' | 'v3' | 'markdown')}
+                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-colors text-sm font-medium flex items-center justify-center gap-2 shadow-lg">
+                <i className="ph ph-download-simple"></i> Export Persona
              </button>
           </div>
         </div>
