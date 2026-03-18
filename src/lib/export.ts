@@ -6,12 +6,58 @@ const FALLBACK_PNG_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAA
 
 /**
  * Embeds a Character Card as JSON into a PNG (as tEXt chunk)
- * and triggers a download of the modified PNG file.
+ * and triggers a download of the modified PNG file, or downloads a Markdown file.
  *
  * @param character The character object to export.
- * @param format Whether to export as a V2 or V3 card.
+ * @param format Whether to export as a V2, V3 card, or markdown.
  */
-export async function exportCharacterCard(character: CharacterCard, format: 'v2' | 'v3' = 'v2') {
+export async function exportCharacterCard(character: CharacterCard, format: 'v2' | 'v3' | 'markdown' = 'v2') {
+  // Sanitize character name for the filename
+  const safeName = (character.name || "Unknown").replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
+  if (format === 'markdown') {
+    // Generate Markdown content
+    const mdContent = `You are playing the role of the following character. Always stay in character. Never acknowledge you are an AI.
+
+# Name: ${character.name || ""}
+${character.nickname ? `**Nickname:** ${character.nickname}\n` : ""}
+## Description:
+${character.description || ""}
+
+## Personality:
+${character.personality || ""}
+
+## Scenario:
+${character.scenario || ""}
+
+## First Message:
+${character.first_mes || ""}
+
+${character.mes_example ? `## Message Example:\n${character.mes_example}\n` : ""}
+${character.system_prompt ? `## System Prompt:\n${character.system_prompt}\n` : ""}
+${character.post_history_instructions ? `## Post History Instructions:\n${character.post_history_instructions}\n` : ""}
+${character.creator_notes ? `## Creator Notes:\n${character.creator_notes}\n` : ""}
+${character.alternate_greetings && character.alternate_greetings.length > 0 ? `## Alternate Greetings:\n${character.alternate_greetings.map(g => `- ${g}`).join('\n')}\n` : ""}
+${character.tags && character.tags.length > 0 ? `## Tags:\n${character.tags.join(', ')}\n` : ""}
+${character.creator ? `**Creator:** ${character.creator}\n` : ""}
+${character.character_version ? `**Character Version:** ${character.character_version}\n` : ""}
+`;
+
+    const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${safeName}_card.md`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    return;
+  }
+
   // We need to omit any internal application state from the exported card if there is any,
   // but let's keep it mostly intact, just removing avatarUrl which we use for display
   const { avatarUrl, ...exportData } = character;
@@ -76,8 +122,6 @@ export async function exportCharacterCard(character: CharacterCard, format: 'v2'
     const link = document.createElement("a");
     link.href = newBase64DataUri;
 
-    // Sanitize character name for the filename
-    const safeName = (character.name || "Unknown").replace(/[^a-z0-9]/gi, '_').toLowerCase();
     link.download = `${safeName}_card.png`;
 
     // Trigger download
